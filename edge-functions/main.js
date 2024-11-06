@@ -5,10 +5,11 @@ import {
 } from '@optimizely/optimizely-sdk/dist/optimizely.lite.min.js';
 import optimizelyDatafile from '../lib/optimizely/datafile.json';
 import { v4 as uuidv4 } from 'uuid';
+import datafileHash from '../lib/optimizely/datafile_hash.json';
 
 // Constants for Optimizely client configuration
 const CLIENT_ENGINE = 'EDGIO_EF';
-const COOKIE_NAME = 'optimizely_visitor_id';
+const COOKIE_NAME = `optimizely_visitor_id_${datafileHash.hash}`;
 
 /**
  * Handles incoming HTTP requests and applies A/B testing using Optimizely.
@@ -18,13 +19,15 @@ const COOKIE_NAME = 'optimizely_visitor_id';
  * @returns {Response} The HTTP response after applying A/B testing logic.
  */
 export async function handleHttpRequest(request, context) {
-  // Retrieve or generate a unique user ID from cookies
-  const userId =
-    request.headers
-      .get('Cookie')
-      ?.split(';')
-      .find((cookie) => cookie.trim().startsWith(`${COOKIE_NAME}=`))
-      ?.split('=')[1] || uuidv4();
+  // Retrieve the user ID from cookies
+  const existingUserId = request.headers
+    .get('Cookie')
+    ?.split(';')
+    .find((cookie) => cookie.trim().startsWith(`${COOKIE_NAME}=`))
+    ?.split('=')[1];
+
+  // Generate a new user ID if one doesn't exist
+  let userId = existingUserId || uuidv4();
 
   // Create an Optimizely instance with the preloaded datafile and configuration.
   // This edge function uses the Optimizely SDK Lite which requires a preloaded datafile.
@@ -66,8 +69,10 @@ export async function handleHttpRequest(request, context) {
   const updatedResponse = new Response(updatedBody, response);
 
   // Add the user ID to the response headers as a cookie to ensure the user experience consistency
-  // const cookie = `${COOKIE_NAME}=${userId}; Path=/; Max-Age=31536000; SameSite=Lax`;
-  // updatedResponse.headers.append('Set-Cookie', cookie);
+  if (!existingUserId) {
+    const cookie = `${COOKIE_NAME}=${userId}; Path=/; Max-Age=31536000; SameSite=Lax`;
+    updatedResponse.headers.append('Set-Cookie', cookie);
+  }
 
   return updatedResponse;
 }
