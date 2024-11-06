@@ -1,11 +1,20 @@
 // This file was automatically added by edgio init.
 // You should commit this file to source control.
 import { Router } from '@edgio/core/router';
+import datafileHash from './lib/optimizely/datafile_hash.json';
+
 export default new Router()
-  // Add a custom route for the Optimizely Edge Function
-  .match('/', {
-    edge_function: './edge-functions/main.js',
-  })
+  // Invoke the Optimizely Edge Function for new users
+  .match(
+    {
+      cookies: {
+        [`optimizely_visitor_id_${datafileHash.hash}`]: /^$/,
+      },
+    },
+    {
+      edge_function: './edge-functions/main.js',
+    }
+  )
 
   .match('/:path*/:file.:ext(js|mjs|css)', {
     headers: {
